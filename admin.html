@@ -49,6 +49,7 @@
           </div>
           <textarea id="p-deskripsi" placeholder="Keterangan singkat" rows="3" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3"></textarea>
           <input id="p-harga" type="number" placeholder="Harga (contoh: 8000)" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
+          <input id="p-stok" type="number" placeholder="Jumlah stok (contoh: 10)" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
           <button onclick="saveProduct()" class="w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold">Simpan Produk</button>
           <p id="p-status" class="text-sm text-green-700 hidden">Tersimpan.</p>
         </div>
@@ -189,6 +190,7 @@ db.collection('products').orderBy('createdAt','desc').limit(1).onSnapshot(snap=>
   document.getElementById('p-nama').value = d.nama || '';
   document.getElementById('p-deskripsi').value = d.deskripsi || '';
   document.getElementById('p-harga').value = d.harga || '';
+  document.getElementById('p-stok').value = (d.stok !== undefined ? d.stok : '');
   currentFotoUrl = d.foto_url || '';
   if(currentFotoUrl){
     document.getElementById('p-foto-preview').src = currentFotoUrl;
@@ -214,6 +216,7 @@ async function saveProduct(){
     foto_url: fotoUrl,
     deskripsi: document.getElementById('p-deskripsi').value.trim(),
     harga: Number(document.getElementById('p-harga').value || 0),
+    stok: Number(document.getElementById('p-stok').value || 0),
   };
 
   if(editingProductId){
