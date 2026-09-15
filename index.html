@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesan Minum</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background:#0F3D3E; }
+  .font-display { font-family: 'Fraunces', serif; }
+  .wave { animation: sway 7s ease-in-out infinite; transform-origin: center; }
+  @keyframes sway { 0%,100%{ transform: rotate(0deg);} 50%{ transform: rotate(1.2deg);} }
+  @media (prefers-reduced-motion: reduce) { .wave { animation: none; } }
+  #bg-photo {
+    position: fixed; inset: 0; z-index: -2;
+    background-size: cover; background-position: center;
+  }
+  #bg-overlay {
+    position: fixed; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, rgba(15,61,62,0.55), rgba(15,61,62,0.85));
+  }
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body class="min-h-screen text-[#F3EFE4]">
+
+  <div id="bg-photo"></div>
+  <div id="bg-overlay"></div>
+
+  <!-- HERO -->
+  <header class="max-w-3xl mx-auto px-6 pt-14 pb-10">
+    <p class="text-sm tracking-wide text-[#E8874A] font-semibold">Etalase kecil, dibuat sendiri</p>
+    <h1 class="font-display italic text-4xl sm:text-5xl mt-3 leading-tight">
+      Kopinya KIK.
+    </h1>
+    <p class="mt-4 text-[#CFE8E3] max-w-md">
+      Produknya baru satu, lagi ngerintis hehe :) — dipesan langsung, diantar ke ruangan Bapak/Ibu guru.
+    </p>
+  </header>
+
+  <!-- PRODUCT AREA -->
+  <main class="max-w-3xl mx-auto px-6 pb-24">
+    <div id="product-area"></div>
+  </main>
+
+  <!-- ORDER MODAL -->
+  <div id="order-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center px-6 z-50">
+    <div class="bg-[#F3EFE4] text-[#0F3D3E] rounded-2xl max-w-sm w-full p-6">
+      <h2 class="font-display text-2xl mb-1" id="modal-product-name">Pesan</h2>
+      <p class="text-sm text-[#3B6B66] mb-4">Tulis nama Bapak/Ibu yang mau menerima minumannya.</p>
+      <input id="input-nama" type="text" placeholder="Nama penerima"
+        class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3 mb-2 focus:outline-none focus:ring-2 focus:ring-[#E8874A]">
+      <p id="error-nama" class="text-red-600 text-sm mb-2 hidden">Nama penerima wajib diisi.</p>
+      <div class="flex gap-3 mt-3">
+        <button onclick="closeModal()" class="flex-1 py-3 rounded-lg border border-[#0F3D3E]/20 font-medium">Batal</button>
+        <button onclick="submitOrder()" class="flex-1 py-3 rounded-lg bg-[#0F3D3E] text-white font-medium">Kirim Pesanan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS TOAST -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#E8874A] text-[#0F3D3E] px-5 py-3 rounded-full font-medium hidden shadow-lg z-50"></div>
+
+  <!-- admin entry: titik tiga -->
+  <button onclick="toggleMenu()" class="fixed top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl">⋮</button>
+  <div id="menu" class="fixed top-16 right-5 bg-[#F3EFE4] text-[#0F3D3E] rounded-lg shadow-lg overflow-hidden hidden z-40">
+    <a href="admin.html" class="block px-5 py-3 text-sm font-medium hover:bg-black/5">Masuk sebagai Admin</a>
+  </div>
+
+<script>
+let currentProductId = null;
+let currentProductName = "";
+
+db.collection('settings').doc('general').onSnapshot(doc=>{
+  const url = doc.exists ? (doc.data().background_url || '') : '';
+  document.getElementById('bg-photo').style.backgroundImage = url ? `url('${url}')` : 'none';
+});
+
+function toggleMenu(){
+  document.getElementById('menu').classList.toggle('hidden');
+}
+
+function renderEmptyState(){
+  document.getElementById('product-area').innerHTML = `
+    <div class="border border-white/15 rounded-2xl p-10 text-center text-[#CFE8E3]">
+      <p class="font-display italic text-xl">Belum ada produk dipajang.</p>
+      <p class="text-sm mt-2 opacity-70">Tunggu sebentar, lagi disiapkan.</p>
+    </div>`;
+}
+
+function renderProduct(p){
+  document.getElementById('product-area').innerHTML = `
+    <div class="wave bg-[#F3EFE4] text-[#0F3D3E] rounded-3xl overflow-hidden shadow-2xl">
+      ${p.foto_url ? `<img src="${p.foto_url}" alt="${p.nama}" class="w-full h-64 object-cover">` : `<div class="w-full h-64 bg-[#0F3D3E]/10 flex items-center justify-center text-[#0F3D3E]/40 font-display italic">Foto menyusul</div>`}
+      <div class="p-6">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-display text-2xl">${p.nama}</h2>
+          <p class="font-semibold text-lg whitespace-nowrap">Rp${Number(p.harga).toLocaleString('id-ID')}</p>
+        </div>
+        <p class="text-[#3B6B66] mt-2">${p.deskripsi || ''}</p>
+        <button onclick="openModal('${p.id}','${p.nama.replace(/'/g,"\\'")}')"
+          class="mt-5 w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold hover:brightness-95 transition">
+          Pesan
+        </button>
+      </div>
+    </div>`;
+}
+
+function openModal(id, nama){
+  currentProductId = id;
+  currentProductName = nama;
+  document.getElementById('modal-product-name').innerText = 'Pesan ' + nama;
+  document.getElementById('input-nama').value = '';
+  document.getElementById('error-nama').classList.add('hidden');
+  document.getElementById('order-modal').classList.remove('hidden');
+  document.getElementById('order-modal').classList.add('flex');
+}
+
+function closeModal(){
+  document.getElementById('order-modal').classList.add('hidden');
+  document.getElementById('order-modal').classList.remove('flex');
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.remove('hidden');
+  setTimeout(()=> t.classList.add('hidden'), 2500);
+}
+
+async function submitOrder(){
+  const nama = document.getElementById('input-nama').value.trim();
+  if(!nama){
+    document.getElementById('error-nama').classList.remove('hidden');
+    return;
+  }
+  await db.collection('orders').add({
+    productId: currentProductId,
+    namaProduk: currentProductName,
+    namaPenerima: nama,
+    status: 'menunggu',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  closeModal();
+  showToast('Pesanan terkirim, ditunggu ya! 🍹');
+}
+
+// Listen produk secara real-time (ambil satu produk pertama karena cuma jual 1 jenis)
+db.collection('products').orderBy('createdAt','desc').limit(1)
+  .onSnapshot(snap => {
+    if(snap.empty){ renderEmptyState(); return; }
+    const doc = snap.docs[0];
+    renderProduct({ id: doc.id, ...doc.data() });
+  }, err => { console.error(err); renderEmptyState(); });
+</script>
+</body>
+</html>

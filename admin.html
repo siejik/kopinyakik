@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Pesan Minum</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background:#F3EFE4; }
+  .font-display { font-family: 'Fraunces', serif; }
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body class="min-h-screen text-[#0F3D3E]">
+
+  <header class="max-w-3xl mx-auto px-6 pt-10 pb-6 flex items-center justify-between">
+    <h1 class="font-display italic text-3xl">Dashboard Admin</h1>
+    <a href="index.html" class="text-sm underline text-[#3B6B66]">Lihat halaman konsumen</a>
+  </header>
+
+  <!-- TABS -->
+  <div class="max-w-3xl mx-auto px-6">
+    <div class="flex gap-2 mb-6">
+      <button id="tab-btn-produk" onclick="showTab('produk')" class="px-4 py-2 rounded-full font-medium bg-[#0F3D3E] text-white">Produk</button>
+      <button id="tab-btn-pesanan" onclick="showTab('pesanan')" class="px-4 py-2 rounded-full font-medium bg-white border border-[#0F3D3E]/15">Pesanan</button>
+      <button id="tab-btn-tampilan" onclick="showTab('tampilan')" class="px-4 py-2 rounded-full font-medium bg-white border border-[#0F3D3E]/15">Tampilan</button>
+    </div>
+  </div>
+
+  <main class="max-w-3xl mx-auto px-6 pb-24">
+
+    <!-- TAB PRODUK -->
+    <section id="tab-produk">
+      <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+        <h2 class="font-display text-xl mb-4">Tambah / Ubah Produk</h2>
+        <p class="text-sm text-[#3B6B66] mb-4">Karena cuma jual satu jenis minuman, isi form ini untuk menampilkan/memperbarui produk yang tayang di halaman utama.</p>
+        <div class="space-y-3">
+          <input id="p-nama" type="text" placeholder="Nama minuman" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
+          <div>
+            <label class="block text-sm text-[#3B6B66] mb-1">Foto produk (ambil dari galeri HP)</label>
+            <input id="p-foto-file" type="file" accept="image/*" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3 bg-white">
+            <img id="p-foto-preview" class="mt-2 w-32 h-32 object-cover rounded-lg hidden">
+            <p id="p-foto-uploading" class="text-sm text-[#3B6B66] mt-1 hidden">Mengunggah foto...</p>
+          </div>
+          <textarea id="p-deskripsi" placeholder="Keterangan singkat" rows="3" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3"></textarea>
+          <input id="p-harga" type="number" placeholder="Harga (contoh: 8000)" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
+          <button onclick="saveProduct()" class="w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold">Simpan Produk</button>
+          <p id="p-status" class="text-sm text-green-700 hidden">Tersimpan.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB TAMPILAN -->
+    <section id="tab-tampilan" class="hidden">
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <h2 class="font-display text-xl mb-2">Foto Latar Belakang</h2>
+        <p class="text-sm text-[#3B6B66] mb-4">Pilih foto langsung dari galeri HP kamu untuk dijadikan background halaman utama.</p>
+        <div class="space-y-3">
+          <input id="bg-file" type="file" accept="image/*" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3 bg-white">
+          <img id="bg-preview" class="w-full h-40 object-cover rounded-lg hidden">
+          <p id="bg-uploading" class="text-sm text-[#3B6B66] hidden">Mengunggah foto...</p>
+          <button onclick="saveBackground()" class="w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold">Simpan Background</button>
+          <button onclick="removeBackground()" class="w-full py-3 rounded-full border border-[#0F3D3E]/20 font-medium">Hapus Background (pakai warna polos)</button>
+          <p id="bg-status" class="text-sm text-green-700 hidden">Tersimpan.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB PESANAN -->
+    <section id="tab-pesanan" class="hidden space-y-4">
+      <div>
+        <h3 class="font-display text-lg mb-2">Menunggu diterima</h3>
+        <div id="list-menunggu" class="space-y-3"></div>
+      </div>
+      <div>
+        <h3 class="font-display text-lg mb-2">Sedang diproses</h3>
+        <div id="list-diterima" class="space-y-3"></div>
+      </div>
+      <div>
+        <h3 class="font-display text-lg mb-2">Riwayat selesai</h3>
+        <div id="list-selesai" class="space-y-3"></div>
+      </div>
+    </section>
+
+  </main>
+
+<script>
+function showTab(tab){
+  document.getElementById('tab-produk').classList.toggle('hidden', tab!=='produk');
+  document.getElementById('tab-pesanan').classList.toggle('hidden', tab!=='pesanan');
+  document.getElementById('tab-tampilan').classList.toggle('hidden', tab!=='tampilan');
+  document.getElementById('tab-btn-produk').className = 'px-4 py-2 rounded-full font-medium ' + (tab==='produk' ? 'bg-[#0F3D3E] text-white' : 'bg-white border border-[#0F3D3E]/15');
+  document.getElementById('tab-btn-pesanan').className = 'px-4 py-2 rounded-full font-medium ' + (tab==='pesanan' ? 'bg-[#0F3D3E] text-white' : 'bg-white border border-[#0F3D3E]/15');
+  document.getElementById('tab-btn-tampilan').className = 'px-4 py-2 rounded-full font-medium ' + (tab==='tampilan' ? 'bg-[#0F3D3E] text-white' : 'bg-white border border-[#0F3D3E]/15');
+}
+
+// Muat & simpan background
+let currentBgUrl = '';
+db.collection('settings').doc('general').onSnapshot(doc=>{
+  if(doc.exists){
+    currentBgUrl = doc.data().background_url || '';
+    if(currentBgUrl){
+      document.getElementById('bg-preview').src = currentBgUrl;
+      document.getElementById('bg-preview').classList.remove('hidden');
+    }
+  }
+});
+
+document.getElementById('bg-file').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('bg-preview').src = e.target.result;
+    document.getElementById('bg-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+});
+
+async function saveBackground(){
+  const file = document.getElementById('bg-file').files[0];
+  let url = currentBgUrl;
+  if(file){
+    document.getElementById('bg-uploading').classList.remove('hidden');
+    const path = 'background/' + Date.now() + '_' + file.name;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    url = await ref.getDownloadURL();
+    document.getElementById('bg-uploading').classList.add('hidden');
+  }
+  await db.collection('settings').doc('general').set({ background_url: url }, { merge: true });
+  currentBgUrl = url;
+  const s = document.getElementById('bg-status');
+  s.classList.remove('hidden');
+  setTimeout(()=> s.classList.add('hidden'), 2000);
+}
+
+async function removeBackground(){
+  await db.collection('settings').doc('general').set({ background_url: '' }, { merge: true });
+  currentBgUrl = '';
+  document.getElementById('bg-preview').classList.add('hidden');
+  document.getElementById('bg-file').value = '';
+}
+
+let editingProductId = null;
+let currentFotoUrl = '';
+const storage = firebase.storage();
+
+document.getElementById('p-foto-file').addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('p-foto-preview').src = e.target.result;
+    document.getElementById('p-foto-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+});
+
+// Muat produk yang sudah ada (kalau ada) supaya bisa diedit
+db.collection('products').orderBy('createdAt','desc').limit(1).onSnapshot(snap=>{
+  if(snap.empty) return;
+  const doc = snap.docs[0];
+  editingProductId = doc.id;
+  const d = doc.data();
+  document.getElementById('p-nama').value = d.nama || '';
+  document.getElementById('p-deskripsi').value = d.deskripsi || '';
+  document.getElementById('p-harga').value = d.harga || '';
+  currentFotoUrl = d.foto_url || '';
+  if(currentFotoUrl){
+    document.getElementById('p-foto-preview').src = currentFotoUrl;
+    document.getElementById('p-foto-preview').classList.remove('hidden');
+  }
+});
+
+async function saveProduct(){
+  const namaInput = document.getElementById('p-nama').value.trim();
+  if(!namaInput){ alert('Nama produk wajib diisi.'); return; }
+
+  const file = document.getElementById('p-foto-file').files[0];
+  let fotoUrl = currentFotoUrl;
+
+  if(file){
+    document.getElementById('p-foto-uploading').classList.remove('hidden');
+    const path = 'produk/' + Date.now() + '_' + file.name;
+    const ref = storage.ref().child(path);
+    await ref.put(file);
+    fotoUrl = await ref.getDownloadURL();
+    document.getElementById('p-foto-uploading').classList.add('hidden');
+  }
+
+  const data = {
+    nama: namaInput,
+    foto_url: fotoUrl,
+    deskripsi: document.getElementById('p-deskripsi').value.trim(),
+    harga: Number(document.getElementById('p-harga').value || 0),
+  };
+
+  if(editingProductId){
+    await db.collection('products').doc(editingProductId).update(data);
+  } else {
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    const ref = await db.collection('products').add(data);
+    editingProductId = ref.id;
+  }
+  currentFotoUrl = fotoUrl;
+  const s = document.getElementById('p-status');
+  s.classList.remove('hidden');
+  setTimeout(()=> s.classList.add('hidden'), 2000);
+}
+
+function orderCard(id, o, actionsHtml){
+  return `
+    <div class="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between gap-3">
+      <div>
+        <p class="font-medium">${o.namaPenerima}</p>
+        <p class="text-sm text-[#3B6B66]">${o.namaProduk || ''}</p>
+      </div>
+      <div class="flex gap-2">${actionsHtml}</div>
+    </div>`;
+}
+
+async function updateStatus(id, status){
+  await db.collection('orders').doc(id).update({
+    status, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+db.collection('orders').orderBy('createdAt','desc')
+  .onSnapshot(snap=>{
+    const menunggu=[], diterima=[], selesai=[];
+    snap.forEach(doc=>{
+      const o = { id: doc.id, ...doc.data() };
+      if(o.status==='menunggu') menunggu.push(o);
+      else if(o.status==='diterima') diterima.push(o);
+      else selesai.push(o);
+    });
+
+    document.getElementById('list-menunggu').innerHTML = menunggu.length ? menunggu.map(o=>
+      orderCard(o.id, o, `<button onclick="updateStatus('${o.id}','diterima')" class="px-3 py-2 rounded-full bg-[#0F3D3E] text-white text-sm font-medium">Terima Pesanan</button>`)
+    ).join('') : `<p class="text-sm text-[#3B6B66]/70">Belum ada pesanan baru.</p>`;
+
+    document.getElementById('list-diterima').innerHTML = diterima.length ? diterima.map(o=>
+      orderCard(o.id, o, `<button onclick="updateStatus('${o.id}','selesai')" class="px-3 py-2 rounded-full bg-[#E8874A] text-[#0F3D3E] text-sm font-medium">Selesai</button>`)
+    ).join('') : `<p class="text-sm text-[#3B6B66]/70">Tidak ada yang diproses.</p>`;
+
+    document.getElementById('list-selesai').innerHTML = selesai.length ? selesai.map(o=>
+      orderCard(o.id, o, `<span class="text-sm text-green-700 font-medium">Selesai</span>`)
+    ).join('') : `<p class="text-sm text-[#3B6B66]/70">Belum ada riwayat.</p>`;
+  });
+</script>
+</body>
+</html>
