@@ -51,8 +51,14 @@
           <input id="p-harga" type="number" placeholder="Harga (contoh: 8000)" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
           <input id="p-stok" type="number" placeholder="Jumlah stok (contoh: 10)" class="w-full border border-[#0F3D3E]/20 rounded-lg px-4 py-3">
           <button onclick="saveProduct()" class="w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold">Simpan Produk</button>
+          <button onclick="resetForm()" class="w-full py-3 rounded-full border border-[#0F3D3E]/20 font-medium">Buat Produk Baru (kosongkan form)</button>
           <p id="p-status" class="text-sm text-green-700 hidden">Tersimpan.</p>
         </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <h2 class="font-display text-xl mb-4">Produk yang Sudah Dibuat</h2>
+        <div id="product-list" class="space-y-3"></div>
       </div>
     </section>
 
@@ -181,22 +187,66 @@ document.getElementById('p-foto-file').addEventListener('change', function(){
   reader.readAsDataURL(file);
 });
 
-// Muat produk yang sudah ada (kalau ada) supaya bisa diedit
-db.collection('products').orderBy('createdAt','desc').limit(1).onSnapshot(snap=>{
-  if(snap.empty) return;
-  const doc = snap.docs[0];
-  editingProductId = doc.id;
-  const d = doc.data();
-  document.getElementById('p-nama').value = d.nama || '';
-  document.getElementById('p-deskripsi').value = d.deskripsi || '';
-  document.getElementById('p-harga').value = d.harga || '';
-  document.getElementById('p-stok').value = (d.stok !== undefined ? d.stok : '');
-  currentFotoUrl = d.foto_url || '';
-  if(currentFotoUrl){
-    document.getElementById('p-foto-preview').src = currentFotoUrl;
-    document.getElementById('p-foto-preview').classList.remove('hidden');
+// Muat semua produk, tampilkan sebagai list dengan aksi edit/hapus
+db.collection('products').orderBy('createdAt','desc').onSnapshot(snap=>{
+  const list = document.getElementById('product-list');
+  if(snap.empty){
+    list.innerHTML = `<p class="text-sm text-[#3B6B66]/70">Belum ada produk.</p>`;
+    return;
   }
+  list.innerHTML = snap.docs.map(doc=>{
+    const d = doc.data();
+    return `
+      <div class="flex items-center justify-between gap-3 border border-[#0F3D3E]/10 rounded-xl p-3">
+        <div>
+          <p class="font-medium">${d.nama}</p>
+          <p class="text-sm text-[#3B6B66]">Rp${Number(d.harga||0).toLocaleString('id-ID')} · Stok: ${d.stok !== undefined ? d.stok : '-'}</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="editProduct('${doc.id}')" class="px-3 py-2 rounded-full bg-[#0F3D3E] text-white text-sm font-medium">Edit</button>
+          <button onclick="deleteProduct('${doc.id}')" class="px-3 py-2 rounded-full border border-red-300 text-red-600 text-sm font-medium">Hapus</button>
+        </div>
+      </div>`;
+  }).join('');
 });
+
+function editProduct(id){
+  db.collection('products').doc(id).get().then(doc=>{
+    if(!doc.exists) return;
+    const d = doc.data();
+    editingProductId = id;
+    document.getElementById('p-nama').value = d.nama || '';
+    document.getElementById('p-deskripsi').value = d.deskripsi || '';
+    document.getElementById('p-harga').value = d.harga || '';
+    document.getElementById('p-stok').value = (d.stok !== undefined ? d.stok : '');
+    currentFotoUrl = d.foto_url || '';
+    if(currentFotoUrl){
+      document.getElementById('p-foto-preview').src = currentFotoUrl;
+      document.getElementById('p-foto-preview').classList.remove('hidden');
+    } else {
+      document.getElementById('p-foto-preview').classList.add('hidden');
+    }
+    document.getElementById('p-foto-file').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+async function deleteProduct(id){
+  if(!confirm('Yakin mau hapus produk ini?')) return;
+  await db.collection('products').doc(id).delete();
+  if(editingProductId === id) resetForm();
+}
+
+function resetForm(){
+  editingProductId = null;
+  currentFotoUrl = '';
+  document.getElementById('p-nama').value = '';
+  document.getElementById('p-deskripsi').value = '';
+  document.getElementById('p-harga').value = '';
+  document.getElementById('p-stok').value = '';
+  document.getElementById('p-foto-file').value = '';
+  document.getElementById('p-foto-preview').classList.add('hidden');
+}
 
 async function saveProduct(){
   const namaInput = document.getElementById('p-nama').value.trim();
