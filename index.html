@@ -37,7 +37,7 @@
   <header class="max-w-3xl mx-auto px-6 pt-14 pb-10">
     <p class="text-sm tracking-wide text-[#E8874A] font-semibold">Etalase kecil, dibuat sendiri</p>
     <h1 class="font-display italic text-4xl sm:text-5xl mt-3 leading-tight">
-      Kopinya KIK.
+      Satu minuman, dibuat dengan niat.
     </h1>
     <p class="mt-4 text-[#CFE8E3] max-w-md">
       Produknya baru satu, lagi ngerintis hehe :) — dipesan langsung, diantar ke ruangan Bapak/Ibu guru.
@@ -95,6 +95,8 @@ function renderEmptyState(){
 }
 
 function renderProduct(p){
+  const stok = p.stok !== undefined ? Number(p.stok) : null;
+  const habis = stok !== null && stok <= 0;
   document.getElementById('product-area').innerHTML = `
     <div class="wave bg-[#F3EFE4] text-[#0F3D3E] rounded-3xl overflow-hidden shadow-2xl">
       ${p.foto_url ? `<img src="${p.foto_url}" alt="${p.nama}" class="w-full h-64 object-cover">` : `<div class="w-full h-64 bg-[#0F3D3E]/10 flex items-center justify-center text-[#0F3D3E]/40 font-display italic">Foto menyusul</div>`}
@@ -104,9 +106,10 @@ function renderProduct(p){
           <p class="font-semibold text-lg whitespace-nowrap">Rp${Number(p.harga).toLocaleString('id-ID')}</p>
         </div>
         <p class="text-[#3B6B66] mt-2">${p.deskripsi || ''}</p>
-        <button onclick="openModal('${p.id}','${p.nama.replace(/'/g,"\\'")}')"
-          class="mt-5 w-full py-3 rounded-full bg-[#E8874A] text-[#0F3D3E] font-semibold hover:brightness-95 transition">
-          Pesan
+        ${stok !== null ? `<p class="text-sm mt-2 ${habis ? 'text-red-600' : 'text-[#3B6B66]'} font-medium">${habis ? 'Stok habis' : 'Sisa stok: ' + stok}</p>` : ''}
+        <button onclick="openModal('${p.id}','${p.nama.replace(/'/g,"\\'")}')" ${habis ? 'disabled' : ''}
+          class="mt-5 w-full py-3 rounded-full font-semibold transition ${habis ? 'bg-[#0F3D3E]/15 text-[#0F3D3E]/40 cursor-not-allowed' : 'bg-[#E8874A] text-[#0F3D3E] hover:brightness-95'}">
+          ${habis ? 'Stok Habis' : 'Pesan'}
         </button>
       </div>
     </div>`;
@@ -140,15 +143,32 @@ async function submitOrder(){
     document.getElementById('error-nama').classList.remove('hidden');
     return;
   }
-  await db.collection('orders').add({
-    productId: currentProductId,
-    namaProduk: currentProductName,
-    namaPenerima: nama,
-    status: 'menunggu',
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  closeModal();
-  showToast('Pesanan terkirim, ditunggu ya! 🍹');
+  try{
+    await db.runTransaction(async (t) => {
+      const productRef = db.collection('products').doc(currentProductId);
+      const productDoc = await t.get(productRef);
+      const data = productDoc.data();
+      if(data.stok !== undefined && Number(data.stok) <= 0){
+        throw new Error('habis');
+      }
+      const orderRef = db.collection('orders').doc();
+      t.set(orderRef, {
+        productId: currentProductId,
+        namaProduk: currentProductName,
+        namaPenerima: nama,
+        status: 'menunggu',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      if(data.stok !== undefined){
+        t.update(productRef, { stok: Number(data.stok) - 1 });
+      }
+    });
+    closeModal();
+    showToast('Pesanan terkirim, ditunggu ya! 🍹');
+  } catch(err){
+    closeModal();
+    showToast('Yah, baru saja kehabisan stok 😅');
+  }
 }
 
 // Listen produk secara real-time (ambil satu produk pertama karena cuma jual 1 jenis)
